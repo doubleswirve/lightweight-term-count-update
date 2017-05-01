@@ -43,9 +43,9 @@ class LTCU_Plugin {
 
 	/**
 	 * An array of post IDs representing the attachments with inherited status that must be processed
-	 * 
+	 *
 	 * @var array
-	 * 
+	 *
 	 */
 
 	public $attachments = array();
@@ -86,7 +86,7 @@ class LTCU_Plugin {
 		// Prevent core from counting terms.
 		wp_defer_term_counting( true );
 		remove_action( 'transition_post_status', '_update_term_count_on_transition_post_status' );
-		
+
 		/**
 		 * Change the attachment limit.  This is the maximum number of attachments a post may have while still being subject to this alternate counting method.
 		 *
@@ -102,7 +102,7 @@ class LTCU_Plugin {
 		 *                                Defaults to ['publish'].
 		 */
 		$this->counted_statuses = apply_filters( 'ltcu_counted_statuses', $this->counted_statuses );
-		add_action( 'transition_post_status', array( $this, 'transition_post_status' ), 10, 3 );
+		add_action( 'transition_post_status', array( $this, 'transition_post_status' ), 5, 3 );
 		add_action( 'added_term_relationship', array( $this, 'added_term_relationship' ), 10, 3 );
 		add_action( 'deleted_term_relationships', array( $this, 'deleted_term_relationships' ), 10, 3 );
 	}
@@ -177,7 +177,7 @@ class LTCU_Plugin {
 
 		// if we're not an attachment, check if there are any and respond accordingly
 		if ( 'attachment' !== $post->post_type ) {
-			
+
 			//query for one more attachment than the limit -- this avoids unnecessary no-limit queries here
 			$attachment_query_limit = ( $this->attachment_limit === -1 ) ? -1 : $this->attachment_limit + 1;
 			$attachments = new WP_Query( array(
@@ -197,15 +197,15 @@ class LTCU_Plugin {
 				if ( has_action( 'ltcu_alternate_transition_post_status' ) ) {
 					// execute any alternate counting method for high-attachment edge cases
 					do_action( 'ltcu_alternate_transition_post_status', $new_status, $old_status, $post );
-				}else{
+				} else {
 					//fall back to the normal behavior for high-attachment posts
 					wp_defer_term_counting( false );
-					_update_term_count_on_transition_post_status( $new_status, $old_status, $post );
+					add_action( 'transition_post_status', '_update_term_count_on_transition_post_status', 10, 3 );
 				}
 				return;
 			}
 
-			// note: there are always the correct number of attachments here even though the limit was one higher  
+			// note: there are always the correct number of attachments here even though the limit was one higher
 			$this->attachments = $attachments->posts;
 		}
 
