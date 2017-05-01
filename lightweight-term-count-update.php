@@ -255,49 +255,50 @@ class LTCU_Plugin {
 		}
 
 		$tax_obj = get_taxonomy( $taxonomy );
-		if ( $tax_obj ) {
-			$tt_ids = array_filter( array_map( 'intval', (array) $tt_ids ) );
+		if ( false === $tax_obj ) {
+			return;
+		}
+		$tt_ids = array_filter( array_map( 'intval', (array) $tt_ids ) );
 
-			// Respect if a taxonomy has a callback override.
-			if ( ! empty( $tax_obj->update_count_callback ) ) {
-				call_user_func( $tax_obj->update_count_callback, $tt_ids, $tax_obj->name );
-			} elseif ( ! empty( $tt_ids ) ) {
-				if ( ! isset( $this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ] ) ) {
-					$this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ] = array();
+		// Respect if a taxonomy has a callback override.
+		if ( ! empty( $tax_obj->update_count_callback ) ) {
+			call_user_func( $tax_obj->update_count_callback, $tt_ids, $tax_obj->name );
+		} elseif ( ! empty( $tt_ids ) ) {
+			if ( ! isset( $this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ] ) ) {
+				$this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ] = array();
+			}
+
+			// Ensure that these terms haven't already been counted.
+			$tt_ids = array_diff( $tt_ids, $this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ] );
+
+			if ( ! empty( $tt_ids ) ) {
+				$this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ] = array_merge(
+					$this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ],
+					$tt_ids
+				);
+				$tt_ids_string = '(' . implode( ',', $tt_ids ) . ')';
+
+				if ( 'increment' === $transition_type ) {
+					// Incrementing.
+					$update_query = "UPDATE {$wpdb->term_taxonomy} AS tt SET tt.count = tt.count + 1 WHERE tt.term_taxonomy_id IN $tt_ids_string";
+				} else {
+					// Decrementing.
+					$update_query = "UPDATE {$wpdb->term_taxonomy} AS tt SET tt.count = tt.count - 1 WHERE tt.term_taxonomy_id IN $tt_ids_string AND tt.count > 0";
 				}
 
-				// Ensure that these terms haven't already been counted.
-				$tt_ids = array_diff( $tt_ids, $this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ] );
-
-				if ( ! empty( $tt_ids ) ) {
-					$this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ] = array_merge(
-						$this->counted_terms[ $object_id ][ $taxonomy ][ $transition_type ],
-						$tt_ids
-					);
-					$tt_ids_string = '(' . implode( ',', $tt_ids ) . ')';
-
-					if ( 'increment' === $transition_type ) {
-						// Incrementing.
-						$update_query = "UPDATE {$wpdb->term_taxonomy} AS tt SET tt.count = tt.count + 1 WHERE tt.term_taxonomy_id IN $tt_ids_string";
-					} else {
-						// Decrementing.
-						$update_query = "UPDATE {$wpdb->term_taxonomy} AS tt SET tt.count = tt.count - 1 WHERE tt.term_taxonomy_id IN $tt_ids_string AND tt.count > 0";
-					}
-
-					foreach ( $tt_ids as $tt_id ) {
-						/** This action is documented in wp-includes/taxonomy.php */
-						do_action( 'edit_term_taxonomy', $tt_id, $taxonomy );
-					}
-					$wpdb->query( $update_query ); // WPCS: unprepared SQL ok.
-					foreach ( $tt_ids as $tt_id ) {
-						/** This action is documented in wp-includes/taxonomy.php */
-						do_action( 'edited_term_taxonomy', $tt_id, $taxonomy );
-					}
+				foreach ( $tt_ids as $tt_id ) {
+					/** This action is documented in wp-includes/taxonomy.php */
+					do_action( 'edit_term_taxonomy', $tt_id, $taxonomy );
 				}
-			} // End if().
-
-			clean_term_cache( $tt_ids, $taxonomy, false );
+				$wpdb->query( $update_query ); // WPCS: unprepared SQL ok.
+				foreach ( $tt_ids as $tt_id ) {
+					/** This action is documented in wp-includes/taxonomy.php */
+					do_action( 'edited_term_taxonomy', $tt_id, $taxonomy );
+				}
+			}
 		} // End if().
+
+		clean_term_cache( $tt_ids, $taxonomy, false );
 	}
 
 	/**
