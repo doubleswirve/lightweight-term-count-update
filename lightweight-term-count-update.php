@@ -259,6 +259,9 @@ class LTCU_Plugin {
 			return;
 		}
 		$tt_ids = array_filter( array_map( 'intval', (array) $tt_ids ) );
+		if ( empty( $tt_ids ) ) {
+			return;
+		}
 
 		// Respect if a taxonomy has a callback override.
 		if ( ! empty( $tax_obj->update_count_callback ) ) {
